@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
+import { connectDb } from './config/db.js';
 import apiRoutes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
@@ -51,6 +52,19 @@ export function createApp() {
     res.json({ success: true, status: 'ok' });
   });
 
+  app.get('/', (_req, res) => {
+    res.json({ success: true, service: 'linkedin-ai-agent' });
+  });
+
+  app.use(async (req, res, next) => {
+    try {
+      await connectDb();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.use('/api', apiRoutes);
 
   app.use(notFoundHandler);
@@ -58,3 +72,6 @@ export function createApp() {
 
   return app;
 }
+
+const app = createApp();
+export default app;
