@@ -9,6 +9,7 @@ import { logger } from './config/logger.js';
 import { connectDb } from './config/db.js';
 import apiRoutes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { sendHome, sendPrivacy, sendTerms } from './pages/publicSite.js';
 
 export function createApp() {
   const app = express();
@@ -52,9 +53,9 @@ export function createApp() {
     res.json({ success: true, status: 'ok' });
   });
 
-  app.get('/', (_req, res) => {
-    res.json({ success: true, service: 'linkedin-ai-agent' });
-  });
+  app.get('/', sendHome);
+  app.get('/privacy', sendPrivacy);
+  app.get('/terms', sendTerms);
 
   app.use(async (req, res, next) => {
     try {
