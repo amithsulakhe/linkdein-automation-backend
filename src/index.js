@@ -1,3 +1,5 @@
+console.log('API process started, loading app…');
+
 import app from './app.js';
 import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
@@ -6,6 +8,8 @@ import { startPublishWorker } from './workers/publishWorker.js';
 import { startIngestionWorker } from './workers/ingestionWorker.js';
 import { startDailyGenerationCron } from './jobs/dailyGenerationCron.js';
 import { closeRedis, getRedisConnection } from './queues/connection.js';
+import { publishStuckApprovedPosts } from './services/publishPostService.js';
+import { resumeStuckDocuments } from './services/documentService.js';
 
 let server;
 let publishWorker;
@@ -33,6 +37,12 @@ async function start() {
 
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, 'Server listening');
+    publishStuckApprovedPosts().catch((err) => {
+      logger.error({ err: err.message }, 'Startup publish of approved posts failed');
+    });
+    resumeStuckDocuments().catch((err) => {
+      logger.error({ err: err.message }, 'Resume document processing failed');
+    });
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

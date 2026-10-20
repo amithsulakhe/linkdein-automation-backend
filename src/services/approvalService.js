@@ -170,9 +170,9 @@ export async function confirmApproval({
         req,
       });
 
-      const { enqueuePublishJob } = await import('../queues/publishQueue.js');
-      await enqueuePublishJob(post);
-      return { status: 'APPROVED', postId: post._id };
+      const { publishApprovedPost } = await import('./publishPostService.js');
+      const published = await publishApprovedPost(post._id);
+      return { status: published.status || 'PUBLISHED', postId: post._id, publishedUrl: published.publishedUrl };
     }
 
     approval.status = 'REJECTED';

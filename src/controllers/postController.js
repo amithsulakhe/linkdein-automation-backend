@@ -288,12 +288,14 @@ export const retryPublish = asyncHandler(async (req, res) => {
   if (post.status !== 'PUBLISH_FAILED' && post.status !== 'APPROVED') {
     throw new ApiError(409, `Cannot retry publish for status ${post.status}`);
   }
-  post.status = 'APPROVED';
-  post.lastPublishingError = undefined;
-  await post.save();
-  const { enqueuePublishJob } = await import('../queues/publishQueue.js');
-  await enqueuePublishJob(post);
-  res.json({ success: true, data: { postId: post._id, status: post.status, message: 'Publish queued' } });
+  if (post.status === 'PUBLISH_FAILED') {
+    post.status = 'APPROVED';
+    post.lastPublishingError = undefined;
+    await post.save();
+  }
+  const { publishApprovedPost } = await import('../services/publishPostService.js');
+  const published = await publishApprovedPost(post._id);
+  res.json({ success: true, data: { postId: post._id, status: published.status, publishedUrl: published.publishedUrl } });
 });
 
 export const resendApprovalEmail = asyncHandler(async (req, res) => {

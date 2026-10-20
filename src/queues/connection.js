@@ -9,6 +9,11 @@ export function getRedisConnection() {
     redis = new IORedis(env.REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      connectTimeout: 8000,
+      retryStrategy(times) {
+        if (times > 4) return null;
+        return Math.min(times * 300, 2000);
+      },
     });
     redis.on('error', (err) => {
       if (err?.code === 'ECONNREFUSED') {

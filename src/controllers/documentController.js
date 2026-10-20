@@ -1,6 +1,7 @@
+import fs from 'fs';
 import { asyncHandler, ApiError } from '../utils/apiError.js';
 import { Document } from '../models/Document.js';
-import { saveUploadedDocument, deleteDocument } from '../services/documentService.js';
+import { saveUploadedDocument, deleteDocument, getDocumentFilePath } from '../services/documentService.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 
 export const uploadDocument = asyncHandler(async (req, res) => {
@@ -42,6 +43,17 @@ export const reprocessDocument = asyncHandler(async (req, res) => {
     userId: req.user._id.toString(),
   });
   res.json({ success: true, data: doc });
+});
+
+export const streamDocumentFile = asyncHandler(async (req, res) => {
+  const doc = await Document.findOne({ _id: req.params.id, userId: req.user._id });
+  if (!doc) throw new ApiError(404, 'Not found');
+  if (doc.fileUrl) return res.redirect(doc.fileUrl);
+  const filePath = getDocumentFilePath(doc.storageKey);
+  if (!fs.existsSync(filePath)) throw new ApiError(404, 'File missing');
+  res.setHeader('Content-Type', doc.mimeType);
+  res.setHeader('Content-Disposition', `inline; filename="${doc.originalFilename}"`);
+  fs.createReadStream(filePath).pipe(res);
 });
 
 export const documentStatus = asyncHandler(async (req, res) => {

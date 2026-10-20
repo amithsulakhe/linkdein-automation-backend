@@ -7,6 +7,7 @@ export const POST_STATUSES = [
   'PUBLISHED',
   'REJECTED',
   'EXPIRED',
+  'PUBLISHING',
   'PUBLISH_FAILED',
   'GENERATION_FAILED',
 ];

@@ -5,6 +5,7 @@ import { OAuthConnection } from '../../models/OAuthConnection.js';
 import { decrypt, encrypt } from '../../utils/crypto.js';
 import { ApiError } from '../../utils/apiError.js';
 import { logger } from '../../config/logger.js';
+import { toLinkedInCommentary } from '../../utils/plainPostText.js';
 
 export const LINKEDIN_SCOPES = ['openid', 'profile', 'w_member_social', 'email'];
 
@@ -172,7 +173,7 @@ async function publishPostWithImage(userId, post) {
     headers: linkedInRestHeaders(accessToken),
     body: JSON.stringify({
       author,
-      commentary: post.content,
+      commentary: toLinkedInCommentary(post.content),
       visibility: 'PUBLIC',
       distribution: { feedDistribution: 'MAIN_FEED' },
       content: { media: { id: imageUrn } },
@@ -203,7 +204,7 @@ export async function publishTextPost(userId, text) {
     headers: linkedInRestHeaders(accessToken),
     body: JSON.stringify({
       author,
-      commentary: text,
+      commentary: toLinkedInCommentary(text),
       visibility: 'PUBLIC',
       distribution: { feedDistribution: 'MAIN_FEED' },
       lifecycleState: 'PUBLISHED',

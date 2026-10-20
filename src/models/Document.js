@@ -19,6 +19,9 @@ const documentSchema = new mongoose.Schema(
       default: 'pending',
     },
     chunkCount: { type: Number, default: 0 },
+    pageCount: { type: Number },
+    fileUrl: { type: String },
+    cloudinaryPublicId: { type: String },
     errorInformation: { type: String },
   },
   { timestamps: true }

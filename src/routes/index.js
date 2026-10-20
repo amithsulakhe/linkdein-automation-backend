@@ -37,6 +37,7 @@ import {
 } from '../controllers/analyticsController.js';
 import {
   uploadDocument,
+  streamDocumentFile,
   listDocuments,
   getDocument,
   removeDocument,
@@ -98,6 +99,7 @@ router.post('/analytics/sync', protectedRoutes, syncAnalytics);
 
 router.post('/documents/upload', protectedRoutes, uploadMiddleware.single('file'), uploadDocument);
 router.get('/documents', protectedRoutes, listDocuments);
+router.get('/documents/:id/file', protectedRoutes, streamDocumentFile);
 router.get('/documents/:id', protectedRoutes, getDocument);
 router.delete('/documents/:id', protectedRoutes, removeDocument);
 router.post('/documents/:id/reprocess', protectedRoutes, reprocessDocument);

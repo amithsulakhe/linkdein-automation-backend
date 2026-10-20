@@ -9,6 +9,21 @@ export function toPlainLinkedInText(text) {
     .trim();
 }
 
+/** LinkedIn treats these as formatting and drops the rest of the post unless they are escaped. */
+const LINKEDIN_RESERVED = /[\\()[\]{}<>|@*_~#]/g;
+
+export function toLinkedInCommentary(text) {
+  const source = String(text || '');
+  const hashtags = [];
+  const shielded = source.replace(/(^|[\s])(#[\p{L}\p{N}_]+)/gu, (_match, lead, tag) => {
+    const token = `⟦H${hashtags.length}⟧`;
+    hashtags.push(tag);
+    return `${lead}${token}`;
+  });
+  const escaped = shielded.replace(LINKEDIN_RESERVED, (ch) => `\\${ch}`);
+  return escaped.replace(/⟦H(\d+)⟧/g, (_match, index) => hashtags[Number(index)]);
+}
+
 export function formatDisplayDate(value, timeZone = 'Asia/Kolkata') {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';

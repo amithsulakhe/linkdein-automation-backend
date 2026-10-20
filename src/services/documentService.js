@@ -6,6 +6,9 @@ import { DocumentChunk } from '../models/DocumentChunk.js';
 import { env, getFileStorageConfig } from '../config/env.js';
 import { validateUpload } from '../validators/documentValidation.js';
 import { ApiError } from '../utils/apiError.js';
+import { uploadDocumentFile, deleteCloudinaryFile } from './cloudinaryService.js';
+import { processDocument } from './documentIngestion.js';
+import { logger } from '../config/logger.js';
 
 export { validateUpload };
 
@@ -24,6 +27,13 @@ export async function saveUploadedDocument(userId, file) {
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.rename(file.path, dest);
 
+  let cloud = null;
+  try {
+    cloud = await uploadDocumentFile(dest, { userId: userId.toString(), filename: file.originalname });
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Cloudinary upload failed; file kept locally');
+  }
+
   const doc = await Document.create({
     userId,
     originalFilename: file.originalname,
@@ -31,10 +41,15 @@ export async function saveUploadedDocument(userId, file) {
     mimeType: file.mimetype,
     fileSize: file.size,
     processingStatus: 'pending',
+    fileUrl: cloud?.fileUrl,
+    cloudinaryPublicId: cloud?.publicId,
   });
 
-  const { ingestionQueue } = await import('../queues/ingestionQueue.js');
-  await ingestionQueue.add('ingest', { documentId: doc._id.toString(), userId: userId.toString() });
+  setImmediate(() => {
+    processDocument(doc._id, userId).catch((err) => {
+      logger.error({ err: err.message, documentId: doc._id }, 'Background document processing failed');
+    });
+  });
   return doc;
 }
 
@@ -50,8 +65,22 @@ export async function deleteDocument(userId, documentId) {
   } catch {
     /* file may already be gone */
   }
+  try {
+    await deleteCloudinaryFile(doc.cloudinaryPublicId);
+  } catch {
+    /* cloud file may already be gone */
+  }
   await DocumentChunk.deleteMany({ documentId: doc._id, userId });
   await doc.deleteOne();
+}
+
+export async function resumeStuckDocuments() {
+  const stuck = await Document.find({ processingStatus: { $in: ['pending', 'processing'] } }).select('_id userId');
+  for (const doc of stuck) {
+    processDocument(doc._id, doc.userId).catch((err) => {
+      logger.error({ err: err.message, documentId: doc._id }, 'Resume document processing failed');
+    });
+  }
 }
 
 export function getDocumentFilePath(storageKey) {
