@@ -45,12 +45,14 @@ export function slotIdToLabel(slotId) {
 function getLocalHourMinute(date, timezone) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
   }).formatToParts(date);
+  let hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  if (hour === 24) hour = 0;
   return {
-    hour: parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10),
+    hour,
     minute: parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10),
   };
 }
@@ -60,6 +62,14 @@ export function getMatchingSlotsForUserNow(user, now = new Date()) {
   const tz = user.timezone || env.APP_TIMEZONE;
   const { hour, minute } = getLocalHourMinute(now, tz);
   return getUserScheduledPostTimes(user).filter((s) => s.hour === hour && s.minute === minute);
+}
+
+/** Slots whose time today has already arrived, including ones missed while the server was down. */
+export function getDueSlotsForUserNow(user, now = new Date()) {
+  const tz = user.timezone || env.APP_TIMEZONE;
+  const { hour, minute } = getLocalHourMinute(now, tz);
+  const nowMinutes = hour * 60 + minute;
+  return getUserScheduledPostTimes(user).filter((slot) => slot.hour * 60 + slot.minute <= nowMinutes);
 }
 
 export function getNextScheduledRunForUser(user, now = new Date()) {

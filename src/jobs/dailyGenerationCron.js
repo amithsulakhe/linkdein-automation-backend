@@ -1,11 +1,12 @@
 import cron from 'node-cron';
+import { waitUntil } from '@vercel/functions';
 import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 import { ScheduledJob } from '../models/ScheduledJob.js';
 import { runDailyPostWorkflow } from '../agents/graphs/dailyPostGraph.js';
 import { logger } from '../config/logger.js';
 import {
-  getMatchingSlotsForUserNow,
+  getDueSlotsForUserNow,
   slotIdFromTime,
   getNextScheduledRunForUser,
   slotIdToLabel,
@@ -33,18 +34,28 @@ async function runScheduledGenerationForUser(user, slotId) {
     return;
   }
 
-  await ScheduledJob.findOneAndUpdate(
-    { jobKey },
-    {
-      jobKey,
-      userId: user._id,
-      jobType: 'scheduled_post_generation',
-      status: 'running',
-      startedAt: new Date(),
-      metadata: { slotId, jobDateKey },
-    },
-    { upsert: true, new: true }
-  );
+  if (existing) {
+    const claimed = await ScheduledJob.findOneAndUpdate(
+      { jobKey, status: { $nin: ['running', 'completed'] } },
+      { status: 'running', startedAt: new Date(), error: null },
+      { new: true }
+    );
+    if (!claimed) return;
+  } else {
+    try {
+      await ScheduledJob.create({
+        jobKey,
+        userId: user._id,
+        jobType: 'scheduled_post_generation',
+        status: 'running',
+        startedAt: new Date(),
+        metadata: { slotId, jobDateKey },
+      });
+    } catch (err) {
+      if (err.code === 11000) return;
+      throw err;
+    }
+  }
 
   try {
     await runDailyPostWorkflow(user._id, jobDateKey, slotId);
@@ -67,7 +78,7 @@ async function tickScheduledPosts() {
     'preferences.dailyGenerationEnabled': { $ne: false },
   });
   for (const user of users) {
-    const slots = getMatchingSlotsForUserNow(user);
+    const slots = getDueSlotsForUserNow(user);
     for (const slot of slots) {
       const slotId = slotIdFromTime(slot.hour, slot.minute);
       await runScheduledGenerationForUser(user, slotId);
@@ -75,10 +86,28 @@ async function tickScheduledPosts() {
   }
 }
 
+let lastScheduleKick = 0;
+
+export function kickScheduledPosts() {
+  if (env.NODE_ENV === 'test') return;
+  const now = Date.now();
+  if (now - lastScheduleKick < 15000) return;
+  lastScheduleKick = now;
+  const task = tickScheduledPosts().catch((err) => logger.error({ err }, 'Scheduled post tick failed'));
+  if (process.env.VERCEL) {
+    try {
+      waitUntil(task);
+    } catch (err) {
+      logger.warn({ err: err.message }, 'Could not keep the scheduled-post check alive');
+    }
+  }
+}
+
 export function startDailyGenerationCron() {
   cron.schedule('* * * * *', () => {
-    tickScheduledPosts().catch((err) => logger.error({ err }, 'Scheduled post tick failed'));
+    kickScheduledPosts();
   });
+  kickScheduledPosts();
   logger.info({ tz: env.APP_TIMEZONE }, 'Scheduled post checker running every minute (per-user times in Settings)');
 }
 

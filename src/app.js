@@ -10,6 +10,7 @@ import { connectDb } from './config/db.js';
 import apiRoutes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { sendHome, sendPrivacy, sendTerms } from './pages/publicSite.js';
+import { kickScheduledPosts } from './jobs/dailyGenerationCron.js';
 
 export function createApp() {
   const app = express();
@@ -60,6 +61,7 @@ export function createApp() {
   app.use(async (req, res, next) => {
     try {
       await connectDb();
+      kickScheduledPosts();
       next();
     } catch (err) {
       next(err);
