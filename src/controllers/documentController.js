@@ -17,7 +17,9 @@ export const listDocuments = asyncHandler(async (req, res) => {
     Document.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Document.countDocuments(filter),
   ]);
-  res.json({ success: true, data: paginatedResponse(items, total, page, limit) });
+  const uploadedBy = req.user.displayName || req.user.email;
+  const withUploader = items.map((doc) => ({ ...doc.toObject(), uploadedBy }));
+  res.json({ success: true, data: paginatedResponse(withUploader, total, page, limit) });
 });
 
 export const getDocument = asyncHandler(async (req, res) => {
