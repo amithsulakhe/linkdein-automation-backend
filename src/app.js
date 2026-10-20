@@ -80,5 +80,5 @@ const app = createApp();
 export default app;
 
 export const config = {
-  maxDuration: 300,
+  maxDuration: 60,
 };

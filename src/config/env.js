@@ -42,7 +42,6 @@ const envSchema = z.object({
   RAG_CHUNK_SIZE: z.coerce.number().default(1000),
   RAG_CHUNK_OVERLAP: z.coerce.number().default(200),
   MAX_UPLOAD_BYTES: z.coerce.number().default(10 * 1024 * 1024),
-  CRON_SECRET: z.string().min(16).optional(),
   COOKIE_SECURE: z
     .string()
     .transform((v) => v === 'true')
