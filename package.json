@@ -13,6 +13,7 @@
     "@langchain/core": "^0.3.42",
     "@langchain/langgraph": "^0.2.62",
     "@langchain/openai": "^0.4.4",
+    "@vercel/functions": "^3.10.1",
     "bcryptjs": "^3.0.2",
     "bullmq": "^5.41.0",
     "cloudinary": "^2.11.0",

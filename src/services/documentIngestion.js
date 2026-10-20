@@ -3,9 +3,27 @@ import { DocumentChunk } from '../models/DocumentChunk.js';
 import { extractTextFromFile } from '../rag/extractors.js';
 import { splitTextIntoChunks } from '../rag/chunking.js';
 import { embedTexts } from '../rag/embeddings.js';
+import fs from 'fs/promises';
 import path from 'path';
-import { env, getFileStorageConfig } from '../config/env.js';
+import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
+import { getDocumentFilePath } from './documentStorage.js';
+
+async function ensureLocalFile(doc) {
+  const filePath = getDocumentFilePath(doc.storageKey);
+  try {
+    await fs.access(filePath);
+    return filePath;
+  } catch {
+    if (!doc.fileUrl) throw new Error('Uploaded file is no longer on the server');
+    const response = await fetch(doc.fileUrl);
+    if (!response.ok) throw new Error('Could not download the stored file');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, buffer);
+    return filePath;
+  }
+}
 
 export async function processDocument(documentId, userId) {
   const doc = await Document.findOne({ _id: documentId, userId });
@@ -15,8 +33,7 @@ export async function processDocument(documentId, userId) {
   await doc.save();
 
   try {
-    const { basePath } = getFileStorageConfig();
-    const filePath = path.join(path.resolve(basePath), doc.storageKey.replace(/\//g, path.sep));
+    const filePath = await ensureLocalFile(doc);
     const extracted = await extractTextFromFile(filePath, doc.mimeType);
     const text = extracted.text || '';
     doc.pageCount = extracted.pageCount;

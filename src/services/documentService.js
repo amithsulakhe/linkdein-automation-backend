@@ -1,31 +1,39 @@
 import fs from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
+import path from 'path';
 import { Document } from '../models/Document.js';
 import { DocumentChunk } from '../models/DocumentChunk.js';
-import { env, getFileStorageConfig } from '../config/env.js';
 import { validateUpload } from '../validators/documentValidation.js';
 import { ApiError } from '../utils/apiError.js';
 import { uploadDocumentFile, deleteCloudinaryFile } from './cloudinaryService.js';
 import { processDocument } from './documentIngestion.js';
+import { getDocumentFilePath, isServerlessRuntime, moveIntoStorage } from './documentStorage.js';
 import { logger } from '../config/logger.js';
 
 export { validateUpload };
 
-async function ensureStorageDir() {
-  const { basePath } = getFileStorageConfig();
-  const full = path.resolve(basePath);
-  await fs.mkdir(full, { recursive: true });
-  return full;
+async function keepProcessingAlive(task) {
+  if (!isServerlessRuntime()) return false;
+  try {
+    const { waitUntil } = await import('@vercel/functions');
+    waitUntil(task);
+    return true;
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Could not extend the serverless invocation for document processing');
+    return false;
+  }
 }
 
 export async function saveUploadedDocument(userId, file) {
   validateUpload(file);
-  const storageDir = await ensureStorageDir();
-  const storageKey = `${userId}/${crypto.randomUUID()}${path.extname(file.originalname)}`;
-  const dest = path.join(storageDir, storageKey.replace(/\//g, path.sep));
-  await fs.mkdir(path.dirname(dest), { recursive: true });
-  await fs.rename(file.path, dest);
+  const storageKey = `${userId}/${crypto.randomUUID()}${path.extname(file.originalname || '')}`;
+  let dest;
+  try {
+    dest = await moveIntoStorage(file.path, storageKey);
+  } catch (err) {
+    logger.error({ err }, 'Failed to store uploaded file');
+    throw new ApiError(500, 'Could not store the uploaded file');
+  }
 
   let cloud = null;
   try {
@@ -45,11 +53,13 @@ export async function saveUploadedDocument(userId, file) {
     cloudinaryPublicId: cloud?.publicId,
   });
 
-  setImmediate(() => {
-    processDocument(doc._id, userId).catch((err) => {
-      logger.error({ err: err.message, documentId: doc._id }, 'Background document processing failed');
-    });
+  const processing = processDocument(doc._id, userId).catch((err) => {
+    logger.error({ err: err.message, documentId: doc._id }, 'Background document processing failed');
   });
+  if (isServerlessRuntime()) {
+    const extended = await keepProcessingAlive(processing);
+    if (!extended || !cloud?.fileUrl) await processing;
+  }
   return doc;
 }
 
@@ -58,8 +68,7 @@ export async function deleteDocument(userId, documentId) {
   if (!doc) {
     throw new ApiError(404, 'Document not found');
   }
-  const { basePath } = getFileStorageConfig();
-  const filePath = path.join(basePath, doc.storageKey.replace(/\//g, path.sep));
+  const filePath = getDocumentFilePath(doc.storageKey);
   try {
     await fs.unlink(filePath);
   } catch {
@@ -83,7 +92,4 @@ export async function resumeStuckDocuments() {
   }
 }
 
-export function getDocumentFilePath(storageKey) {
-  const { basePath } = getFileStorageConfig();
-  return path.join(basePath, storageKey.replace(/\//g, path.sep));
-}
+export { getDocumentFilePath };

@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app.js": {
+      "maxDuration": 60
+    },
+    "src/index.js": {
+      "maxDuration": 60
+    }
+  }
+}
