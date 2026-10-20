@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from './authRoutes.js';
 import healthRoutes from './healthRoutes.js';
 import { authenticate, loadUser } from '../middleware/auth.js';
+import { runScheduledPosts } from '../controllers/cronController.js';
 import {
   linkedInConnect,
   linkedInCallback,
@@ -57,6 +58,7 @@ const router = Router();
 
 router.use(healthRoutes);
 router.use('/auth', authRoutes);
+router.post('/cron/scheduled-posts', runScheduledPosts);
 
 router.get('/integrations/linkedin/connect', authenticate, loadUser, linkedInConnect);
 router.get('/integrations/linkedin/callback', linkedInCallback);

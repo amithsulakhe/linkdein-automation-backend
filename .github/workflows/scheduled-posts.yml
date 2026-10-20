@@ -1,0 +1,17 @@
+name: Scheduled posts
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate due posts for every user
+        run: |
+          curl --fail-with-body -sS -X POST "https://linkdein-automation-backend.vercel.app/api/cron/scheduled-posts" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 55
