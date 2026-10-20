@@ -10,8 +10,14 @@ export const uploadDocument = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: doc });
 });
 
+const DOCUMENT_PAGE_SIZE = 5;
+
 export const listDocuments = asyncHandler(async (req, res) => {
-  const { page, limit, skip } = parsePagination(req.query);
+  const { page, skip } = parsePagination(req.query, {
+    defaultLimit: DOCUMENT_PAGE_SIZE,
+    maxLimit: DOCUMENT_PAGE_SIZE,
+  });
+  const limit = DOCUMENT_PAGE_SIZE;
   const filter = { userId: req.user._id };
   const [items, total] = await Promise.all([
     Document.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
