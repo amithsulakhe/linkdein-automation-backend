@@ -52,10 +52,12 @@ import {
 } from '../controllers/chatController.js';
 import { getSettings, patchSettings, jobsStatus, resetUserData } from '../controllers/settingsController.js';
 import { uploadMiddleware } from '../middleware/upload.js';
+import { runScheduledPosts } from '../controllers/cronController.js';
 
 const router = Router();
 
 router.use(healthRoutes);
+router.get('/cron/scheduled-posts', runScheduledPosts);
 router.use('/auth', authRoutes);
 
 router.get('/integrations/linkedin/connect', authenticate, loadUser, linkedInConnect);

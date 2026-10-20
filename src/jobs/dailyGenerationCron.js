@@ -72,7 +72,7 @@ async function runScheduledGenerationForUser(user, slotId) {
   }
 }
 
-async function tickScheduledPosts() {
+export async function tickScheduledPosts() {
   const users = await User.find({
     accountStatus: 'active',
     'preferences.dailyGenerationEnabled': { $ne: false },
